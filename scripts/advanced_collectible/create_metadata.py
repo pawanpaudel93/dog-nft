@@ -1,9 +1,16 @@
 import requests
 import json
+import os
 from brownie import AdvancedCollectible, network
 from scripts.helpful_scripts import get_breed
 from metadata.sample_metadata import metadata_template
 from pathlib import Path
+
+PINATA_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS"
+PINATA_HEADERS = {
+    "pinata_api_key": os.getenv("PINATA_API_KEY"),
+    "pinata_secret_api_key": os.getenv("PINATA_SECRET_API_KEY"),
+}
 
 
 def main():
@@ -36,6 +43,7 @@ def main():
             with open(metadata_filename, "w") as fp:
                 json.dump(collectible_metadata, fp, indent=4)
             file_uri = upload_to_ipfs(metadata_filename)
+            # file_uri = upload_to_pinata(metadata_filename)
             metadatas[token_id] = file_uri
     with open(f"./metadata/{network.show_active()}/metadata.json", "w") as fp:
         json.dump(metadatas, fp, indent=4)
@@ -49,6 +57,19 @@ def upload_to_ipfs(filepath):
         response = requests.post(ipfs_url + endpoint, files={"file": file_binary})
         ipfs_hash = response.json()["Hash"]
         filename = filepath.split("/")[-1]
+        file_uri = f"https://ipfs.io/ipfs/{ipfs_hash}?filename={filename}"
+        print(file_uri)
+        return file_uri
+
+
+def upload_to_pinata(filepath):
+    with Path(filepath).open("rb") as fp:
+        filename = filepath.split("/")[-1]
+        file_binary = fp.read()
+        response = requests.post(
+            PINATA_URL, headers=PINATA_HEADERS, files={"file": (filename, file_binary)}
+        )
+        ipfs_hash = response.json()["IpfsHash"]
         file_uri = f"https://ipfs.io/ipfs/{ipfs_hash}?filename={filename}"
         print(file_uri)
         return file_uri
